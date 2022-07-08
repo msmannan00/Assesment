@@ -1,0 +1,116 @@
+version: "3.3"
+
+services:
+    redis_server:
+        image: redis
+        command: redis-server --requirepass killprg1
+        networks:
+            backend:
+                ipv4_address: 10.0.0.3
+
+    tor:
+        build:
+            context: ./
+            dockerfile: dockerFiles/tor_docker
+        networks:
+            backend:
+                ipv4_address: 10.0.0.106
+
+
+    mongo:
+        image: mongo
+        container_name: mongo-db
+        volumes:
+            - ./data/db:/data/db
+        ports:
+            - "27017:27017"
+        networks:
+            backend:
+                ipv4_address: 10.0.0.5
+
+    dynamodb-local:
+      command: -jar DynamoDBLocal.jar -sharedDb -dbPath ./data
+      user: root
+      image: "amazon/dynamodb-local:latest"
+      container_name: dynamodb-local
+      volumes:
+        - "./test/testDataVolume:/home/dynamodblocal/data"
+      working_dir: /home/dynamodblocal
+      networks:
+          backend:
+              ipv4_address: 10.0.0.107
+
+    postgres:
+        image: postgres:9.6
+        environment:
+            - POSTGRES_USER=airflow
+            - POSTGRES_PASSWORD=airflow
+            - POSTGRES_DB=airflow
+        volumes:
+            - /tmp/postgres-data:/var/lib/postgresql/data
+
+    webserver:
+        build: .
+        restart: always
+        depends_on:
+            - postgres
+        environment:
+            - LOAD_EX=n
+            - EXECUTOR=Local
+            - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+        volumes:
+            - ./dags:/usr/local/airflow/dags
+            - /tmp/airflow_logs:/root/airflow/logs
+        ports:
+            - "8084:8084"
+        command: webserver
+
+    scheduler:
+        build: .
+        restart: always
+        depends_on:
+            - postgres
+        environment:
+            - LOAD_EX=n
+            - EXECUTOR=Local
+            - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+        volumes:
+            - ./dags:/usr/local/airflow/dags
+            - /tmp/airflow_logs:/root/airflow/logs
+        command: scheduler
+
+    api:
+        build:
+            context: ./
+            dockerfile: dockerFiles/api_docker
+        depends_on:
+            - mongo
+            - tor
+        networks:
+            backend:
+                ipv4_address: 10.0.0.100
+        volumes:
+            - ./app/:/app
+    celery:
+        build:
+            context: ./
+            dockerfile: dockerFiles/celery_docker
+
+        environment:
+            REDISSERVER: redis://redis_server:6379
+            C_FORCE_ROOT: "true"
+        depends_on:
+            - redis_server
+        networks:
+            backend:
+                ipv4_address: 10.0.0.4
+        volumes:
+            - ./app/:/app
+
+networks:
+  backend:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet: 10.0.0.0/24
