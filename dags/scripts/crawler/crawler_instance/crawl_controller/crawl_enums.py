@@ -1,0 +1,16 @@
+import enum
+
+
+class CRAWL_CONTROLLER_COMMANDS(enum.Enum):
+    S_RUN_CRAWLER = 1
+    S_LOAD_ANALYTICS = 2
+    S_INIT_CRAWLER = 3
+    S_LOAD_ANALYTICS_WEEKLY = 4
+
+
+class CRAWL_MODEL_COMMANDS(enum.Enum):
+    S_INIT = 0
+    S_RUN_CRAWLER = 1
+    S_INIT_DIRECT = 2
+    S_LOAD_ANALYTICS = 3
+    S_LOAD_ANALYTICS_WEEKLY = 4
